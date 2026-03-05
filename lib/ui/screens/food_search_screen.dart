@@ -3,13 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../models/food_item.dart';
+import '../../models/custom_meal.dart';
 import '../../services/openfoodfacts_service.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/fade_edge_scroll.dart';
 import '../widgets/food_item_tile.dart';
 import '../widgets/retro_button.dart';
+import '../widgets/retro_card.dart';
 import 'barcode_scan_screen.dart';
+import 'create_meal_screen.dart';
 
 class FoodSearchScreen extends StatefulWidget {
   const FoodSearchScreen({super.key});
@@ -54,7 +57,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     });
 
     try {
-      final results = await _service.searchFood(query);
+      final results = await _service.searchProducts(query);
       if (mounted) {
         setState(() {
           _results = results;
@@ -198,7 +201,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.translucent,
+      child: SafeArea(
       child: Column(
         children: [
           Padding(
@@ -305,52 +311,351 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                           },
                         ),
                       )
-                    : Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _errorMessage != null
-                                  ? Icons.wifi_off_rounded
-                                  : Icons.search,
-                              size: 48,
-                              color: AppColors.textTertiary,
+                    : _searchController.text.isNotEmpty
+                        // Errore o nessun risultato
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _errorMessage != null
+                                      ? Icons.wifi_off_rounded
+                                      : Icons.search_off,
+                                  size: 48,
+                                  color: AppColors.textTertiary,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _errorMessage ??
+                                      'Nessun risultato per "${_searchController.text}"',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.vt323(
+                                    fontSize: 22,
+                                    color: AppColors.textTertiary,
+                                  ),
+                                ),
+                                if (_errorMessage != null) ...[
+                                  const SizedBox(height: 20),
+                                  RetroButton(
+                                    label: 'RIPROVA',
+                                    icon: Icons.refresh,
+                                    isAccent: true,
+                                    onPressed: () =>
+                                        _performSearch(_searchController.text),
+                                  ),
+                                ],
+                              ],
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _errorMessage ??
-                                  'Cerca un prodotto alimentare\no scansiona un codice a barre',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.vt323(
-                                fontSize: 22,
-                                color: AppColors.textTertiary,
-                              ),
-                            ),
-                            if (_errorMessage != null &&
-                                _searchController.text.isNotEmpty) ...[
-                              const SizedBox(height: 20),
-                              RetroButton(
-                                label: 'RIPROVA',
-                                icon: Icons.refresh,
-                                isAccent: true,
-                                onPressed: () =>
-                                    _performSearch(_searchController.text),
-                              ),
-                            ],
-                            if (_searchController.text.isEmpty) ...[
-                              const SizedBox(height: 24),
-                              RetroButton(
-                                label: 'SCANSIONA BARCODE',
-                                icon: Icons.qr_code_scanner,
-                                isAccent: true,
-                                onPressed: _scanBarcode,
-                              ),
-                            ],
-                          ],
-                        ),
+                          )
+                        // Stato iniziale: mostra piatti salvati + azioni
+                        : _buildHomeContent(),
+          ),
+         ],
+       ),
+     ),
+    );
+  }
+
+  Widget _buildHomeContent() {
+    final meals = context.watch<AppState>().customMeals;
+
+    return FadeEdgeScrollWrapper(
+      fadeHeight: 24,
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 100),
+        children: [
+          const SizedBox(height: 8),
+          // Azioni rapide
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _scanBarcode,
+                    child: RetroCard(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.qr_code_scanner,
+                              size: 28, color: AppColors.warmBlack),
+                          const SizedBox(height: 8),
+                          Text('SCANSIONA',
+                              style: GoogleFonts.pressStart2p(
+                                  fontSize: 7, color: AppColors.warmBlack)),
+                        ],
                       ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _openCreateMeal(),
+                    child: RetroCard(
+                      highlighted: true,
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.restaurant_menu,
+                              size: 28, color: AppColors.warmBlack),
+                          const SizedBox(height: 8),
+                          Text('CREA PIATTO',
+                              style: GoogleFonts.pressStart2p(
+                                  fontSize: 7, color: AppColors.warmBlack)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Sezione piatti salvati
+          if (meals.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('I MIEI PIATTI',
+                      style: GoogleFonts.pressStart2p(
+                          fontSize: 9, color: AppColors.warmBlack)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.offWhite,
+                      borderRadius: BorderRadius.circular(50),
+                      border: Border.all(color: AppColors.subtleBorder),
+                    ),
+                    child: Text('${meals.length}',
+                        style: GoogleFonts.pressStart2p(
+                            fontSize: 7, color: AppColors.textSecondary)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...meals.map((meal) => _SavedMealTile(
+                  meal: meal,
+                  onTap: () => _quickAddMeal(meal),
+                  onEdit: () => _openCreateMeal(existing: meal),
+                  onDelete: () => _deleteMeal(meal),
+                )),
+          ] else ...[
+            const SizedBox(height: 32),
+            Center(
+              child: Text(
+                'Cerca un prodotto alimentare\no crea un piatto personalizzato',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.vt323(
+                    fontSize: 20, color: AppColors.textTertiary),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openCreateMeal({CustomMeal? existing}) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateMealScreen(existingMeal: existing),
+      ),
+    );
+    if (result == true && mounted) {
+      setState(() {}); // Refresh
+    }
+  }
+
+  void _quickAddMeal(CustomMeal meal) {
+    context.read<AppState>().addCustomMealEntry(meal);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: AppColors.warmBlack,
+        content: Text(
+          '${meal.name} aggiunto al diario! (${meal.totalKcal.toStringAsFixed(0)} kcal)',
+          style: GoogleFonts.vt323(fontSize: 20, color: AppColors.offWhite),
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _deleteMeal(CustomMeal meal) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('ELIMINA', style: GoogleFonts.pressStart2p(fontSize: 10)),
+        content: Text(
+          'Eliminare "${meal.name}"?',
+          style: GoogleFonts.vt323(fontSize: 22, color: AppColors.warmBlack),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('ANNULLA',
+                style: GoogleFonts.pressStart2p(
+                    fontSize: 8, color: AppColors.textTertiary)),
+          ),
+          GestureDetector(
+            onTap: () {
+              context.read<AppState>().removeCustomMeal(meal.id);
+              Navigator.pop(ctx);
+            },
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.red.shade100,
+                borderRadius: BorderRadius.circular(50),
+                border: Border.all(color: Colors.red.shade400, width: 2),
+              ),
+              child: Text('ELIMINA',
+                  style: GoogleFonts.pressStart2p(
+                      fontSize: 8, color: Colors.red.shade400)),
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Tile per un piatto salvato
+// ─────────────────────────────────────────────────────────────────────
+
+class _SavedMealTile extends StatelessWidget {
+  final CustomMeal meal;
+  final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _SavedMealTile({
+    required this.meal,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: RetroCard(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            // Icona piatto
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.accentGreen.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.subtleBorder),
+              ),
+              child: const Icon(Icons.restaurant_menu,
+                  size: 20, color: AppColors.warmBlack),
+            ),
+            const SizedBox(width: 12),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    meal.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.vt323(
+                        fontSize: 20, color: AppColors.warmBlack),
+                  ),
+                  Text(
+                    '${meal.ingredients.length} ingredienti · ${meal.totalGrams.toStringAsFixed(0)}g',
+                    style: GoogleFonts.vt323(
+                        fontSize: 16, color: AppColors.textTertiary),
+                  ),
+                ],
+              ),
+            ),
+            // Kcal badge
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.accentGreen.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Text(
+                '${meal.totalKcal.toStringAsFixed(0)} kcal',
+                style: GoogleFonts.pressStart2p(
+                    fontSize: 7, color: AppColors.warmBlack),
+              ),
+            ),
+            const SizedBox(width: 4),
+            // Menu azioni
+            PopupMenuButton<String>(
+              onSelected: (val) {
+                if (val == 'add') onTap();
+                if (val == 'edit') onEdit();
+                if (val == 'delete') onDelete();
+              },
+              icon: const Icon(Icons.more_vert,
+                  size: 18, color: AppColors.textTertiary),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              color: AppColors.cardWhite,
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'add',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.add_circle_outline,
+                          size: 18, color: AppColors.warmBlack),
+                      const SizedBox(width: 8),
+                      Text('Aggiungi al diario',
+                          style: GoogleFonts.vt323(fontSize: 18)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.edit_outlined,
+                          size: 18, color: AppColors.warmBlack),
+                      const SizedBox(width: 8),
+                      Text('Modifica', style: GoogleFonts.vt323(fontSize: 18)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline,
+                          size: 18, color: Colors.red.shade400),
+                      const SizedBox(width: 8),
+                      Text('Elimina',
+                          style: GoogleFonts.vt323(
+                              fontSize: 18, color: Colors.red.shade400)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

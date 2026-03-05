@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../models/food_log_entry.dart';
 import '../models/food_item.dart';
+import '../models/custom_meal.dart';
 import '../services/storage_service.dart';
 
 class AppState extends ChangeNotifier {
@@ -9,6 +10,7 @@ class AppState extends ChangeNotifier {
 
   UserProfile? _profile;
   List<FoodLogEntry> _allEntries = [];
+  List<CustomMeal> _customMeals = [];
   bool _isLoading = true;
 
   UserProfile? get profile => _profile;
@@ -16,6 +18,7 @@ class AppState extends ChangeNotifier {
   bool get hasProfile => _profile != null;
 
   List<FoodLogEntry> get allEntries => _allEntries;
+  List<CustomMeal> get customMeals => _customMeals;
 
   List<FoodLogEntry> get todayEntries {
     final now = DateTime.now();
@@ -45,6 +48,7 @@ class AppState extends ChangeNotifier {
 
     _profile = await _storage.loadProfile();
     _allEntries = await _storage.loadFoodLog();
+    _customMeals = await _storage.loadCustomMeals();
 
     _isLoading = false;
     notifyListeners();
@@ -112,6 +116,40 @@ class AppState extends ChangeNotifier {
       }
     }
     return dates;
+  }
+
+  // ── Custom Meals ──────────────────────────────────────────────────
+
+  Future<void> addCustomMeal(CustomMeal meal) async {
+    _customMeals.add(meal);
+    await _storage.saveCustomMeals(_customMeals);
+    notifyListeners();
+  }
+
+  Future<void> removeCustomMeal(String id) async {
+    _customMeals.removeWhere((m) => m.id == id);
+    await _storage.saveCustomMeals(_customMeals);
+    notifyListeners();
+  }
+
+  Future<void> updateCustomMeal(CustomMeal updated) async {
+    final index = _customMeals.indexWhere((m) => m.id == updated.id);
+    if (index != -1) {
+      _customMeals[index] = updated;
+      await _storage.saveCustomMeals(_customMeals);
+      notifyListeners();
+    }
+  }
+
+  /// Aggiunge un piatto personalizzato al diario usando il suo peso totale.
+  Future<void> addCustomMealEntry(CustomMeal meal) async {
+    final entry = FoodLogEntry(
+      foodItem: meal.toFoodItem(),
+      grams: meal.totalGrams,
+    );
+    _allEntries.add(entry);
+    await _storage.saveFoodLog(_allEntries);
+    notifyListeners();
   }
 }
 

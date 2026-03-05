@@ -52,6 +52,7 @@ class DiaryScreen extends StatelessWidget {
                 ),
               ),
               // Lista giorni
+              const SizedBox(height: 12),
               Expanded(
                 child: dates.isEmpty
                     ? Center(

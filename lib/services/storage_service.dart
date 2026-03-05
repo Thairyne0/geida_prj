@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_profile.dart';
 import '../models/food_log_entry.dart';
+import '../models/custom_meal.dart';
 
 class StorageService {
   static const String _profileKey = 'user_profile';
   static const String _foodLogKey = 'food_log';
+  static const String _customMealsKey = 'custom_meals';
 
   Future<void> saveProfile(UserProfile profile) async {
     final prefs = await SharedPreferences.getInstance();
@@ -69,6 +71,26 @@ class StorageService {
             e.dateTime.month == now.month &&
             e.dateTime.day == now.day)
         .toList();
+  }
+
+  // ── Custom Meals ──────────────────────────────────────────────────
+
+  Future<void> saveCustomMeals(List<CustomMeal> meals) async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = meals.map((m) => m.toJson()).toList();
+    await prefs.setString(_customMealsKey, json.encode(data));
+  }
+
+  Future<List<CustomMeal>> loadCustomMeals() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString(_customMealsKey);
+    if (data != null) {
+      final list = json.decode(data) as List<dynamic>;
+      return list
+          .map((m) => CustomMeal.fromJson(m as Map<String, dynamic>))
+          .toList();
+    }
+    return [];
   }
 }
 
