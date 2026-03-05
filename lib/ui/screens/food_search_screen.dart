@@ -6,6 +6,7 @@ import '../../models/food_item.dart';
 import '../../services/openfoodfacts_service.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/fade_edge_scroll.dart';
 import '../widgets/food_item_tile.dart';
 import '../widgets/retro_button.dart';
 import 'barcode_scan_screen.dart';
@@ -22,6 +23,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   final _service = OpenFoodFactsService();
   List<FoodItem> _results = [];
   bool _isLoading = false;
+  String? _errorMessage;
   Timer? _debounce;
 
   @override
@@ -33,23 +35,42 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   void _onSearchChanged(String query) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
+    _debounce = Timer(const Duration(milliseconds: 600), () {
       _performSearch(query);
     });
   }
 
   Future<void> _performSearch(String query) async {
     if (query.trim().isEmpty) {
-      setState(() => _results = []);
+      setState(() {
+        _results = [];
+        _errorMessage = null;
+      });
       return;
     }
-    setState(() => _isLoading = true);
-    final results = await _service.searchFood(query);
-    if (mounted) {
-      setState(() {
-        _results = results;
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final results = await _service.searchFood(query);
+      if (mounted) {
+        setState(() {
+          _results = results;
+          _isLoading = false;
+          if (results.isEmpty) {
+            _errorMessage = 'Nessun risultato per "$query"';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Errore di rete. Riprova.';
+        });
+      }
     }
   }
 
@@ -98,6 +119,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             TextField(
               controller: gramsController,
               keyboardType: TextInputType.number,
+              autofocus: true,
               style: GoogleFonts.pressStart2p(fontSize: 14),
               decoration: const InputDecoration(
                 suffixText: 'g',
@@ -202,6 +224,8 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                   child: TextField(
                     controller: _searchController,
                     onChanged: _onSearchChanged,
+                    onSubmitted: _performSearch,
+                    textInputAction: TextInputAction.search,
                     style: GoogleFonts.vt323(fontSize: 22),
                     decoration: InputDecoration(
                       hintText: 'Cerca un prodotto...',
@@ -210,6 +234,19 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                         color: AppColors.textTertiary,
                       ),
                       prefixIcon: const Icon(Icons.search, color: AppColors.textTertiary),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? GestureDetector(
+                              onTap: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _results = [];
+                                  _errorMessage = null;
+                                });
+                              },
+                              child: const Icon(Icons.close,
+                                  size: 18, color: AppColors.textTertiary),
+                            )
+                          : null,
                     ),
                   ),
                 ),
@@ -254,27 +291,52 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                       ],
                     ),
                   )
-                : _results.isEmpty
-                    ? Center(
+                : _results.isNotEmpty
+                    ? FadeEdgeScrollWrapper(
+                        fadeHeight: 28,
+                        child: ListView.builder(
+                          itemCount: _results.length,
+                          padding: const EdgeInsets.only(bottom: 100),
+                          itemBuilder: (context, index) {
+                            return FoodItemTile(
+                              foodItem: _results[index],
+                              onTap: () => _showAddDialog(_results[index]),
+                            );
+                          },
+                        ),
+                      )
+                    : Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.search,
+                            Icon(
+                              _errorMessage != null
+                                  ? Icons.wifi_off_rounded
+                                  : Icons.search,
                               size: 48,
                               color: AppColors.textTertiary,
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              _searchController.text.isEmpty
-                                  ? 'Cerca un prodotto alimentare\no scansiona un codice a barre'
-                                  : 'Nessun risultato trovato',
+                              _errorMessage ??
+                                  'Cerca un prodotto alimentare\no scansiona un codice a barre',
                               textAlign: TextAlign.center,
                               style: GoogleFonts.vt323(
                                 fontSize: 22,
                                 color: AppColors.textTertiary,
                               ),
                             ),
+                            if (_errorMessage != null &&
+                                _searchController.text.isNotEmpty) ...[
+                              const SizedBox(height: 20),
+                              RetroButton(
+                                label: 'RIPROVA',
+                                icon: Icons.refresh,
+                                isAccent: true,
+                                onPressed: () =>
+                                    _performSearch(_searchController.text),
+                              ),
+                            ],
                             if (_searchController.text.isEmpty) ...[
                               const SizedBox(height: 24),
                               RetroButton(
@@ -286,16 +348,6 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                             ],
                           ],
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: _results.length,
-                        padding: const EdgeInsets.only(bottom: 100),
-                        itemBuilder: (context, index) {
-                          return FoodItemTile(
-                            foodItem: _results[index],
-                            onTap: () => _showAddDialog(_results[index]),
-                          );
-                        },
                       ),
           ),
         ],

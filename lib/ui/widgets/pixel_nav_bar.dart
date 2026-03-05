@@ -40,10 +40,16 @@ class PixelNavBar extends StatelessWidget {
                 onTap: () => onTap(1),
               ),
               _NavItem(
-                icon: Icons.person_outline,
-                label: 'PROFILO',
+                icon: Icons.menu_book_rounded,
+                label: 'DIARIO',
                 isSelected: currentIndex == 2,
                 onTap: () => onTap(2),
+              ),
+              _NavItem(
+                icon: Icons.person_outline,
+                label: 'PROFILO',
+                isSelected: currentIndex == 3,
+                onTap: () => onTap(3),
               ),
             ],
           ),

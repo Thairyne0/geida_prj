@@ -72,5 +72,46 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Rimuove una entry specifica dalla lista globale.
+  Future<void> removeEntryGlobal(FoodLogEntry entry) async {
+    _allEntries.remove(entry);
+    await _storage.saveFoodLog(_allEntries);
+    notifyListeners();
+  }
+
+  /// Restituisce le entry per un giorno specifico.
+  List<FoodLogEntry> entriesForDate(DateTime date) {
+    return _allEntries
+        .where((e) =>
+            e.dateTime.year == date.year &&
+            e.dateTime.month == date.month &&
+            e.dateTime.day == date.day)
+        .toList();
+  }
+
+  /// Restituisce la somma kcal per un giorno specifico.
+  double kcalForDate(DateTime date) {
+    return entriesForDate(date).fold(0.0, (sum, e) => sum + e.totalKcal);
+  }
+
+  /// Restituisce tutte le date (univoche) che hanno almeno una entry,
+  /// ordinate dal più recente al più vecchio.
+  List<DateTime> get datesWithEntries {
+    final seen = <String>{};
+    final dates = <DateTime>[];
+    // Ordina prima per data decrescente
+    final sorted = List<FoodLogEntry>.from(_allEntries)
+      ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
+    for (final e in sorted) {
+      final key =
+          '${e.dateTime.year}-${e.dateTime.month}-${e.dateTime.day}';
+      if (seen.add(key)) {
+        dates.add(DateTime(
+            e.dateTime.year, e.dateTime.month, e.dateTime.day));
+      }
+    }
+    return dates;
+  }
 }
 

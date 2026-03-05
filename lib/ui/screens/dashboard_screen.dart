@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../state/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/calorie_counter_display.dart';
+import '../widgets/fade_edge_scroll.dart';
 import '../widgets/food_item_tile.dart';
 import '../widgets/retro_card.dart';
 
@@ -18,7 +19,9 @@ class DashboardScreen extends StatelessWidget {
         final profile = state.profile;
         final todayEntries = state.todayEntries;
 
-        return CustomScrollView(
+        return FadeEdgeScrollWrapper(
+          fadeHeight: 24,
+          child: CustomScrollView(
           slivers: [
             SliverAppBar(
               floating: true,
@@ -148,6 +151,7 @@ class DashboardScreen extends StatelessWidget {
               ),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
+        ),
         );
       },
     );

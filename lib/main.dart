@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
 import 'ui/screens/dashboard_screen.dart';
+import 'ui/screens/diary_screen.dart';
 import 'ui/screens/food_search_screen.dart';
 import 'ui/screens/profile_screen.dart';
 import 'ui/widgets/pixel_nav_bar.dart';
@@ -65,6 +66,7 @@ class _HomeShellState extends State<HomeShell> {
   final _screens = const [
     DashboardScreen(),
     FoodSearchScreen(),
+    DiaryScreen(),
     ProfileScreen(),
   ];
 
